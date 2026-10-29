@@ -9,7 +9,7 @@ import {
   invalidateSessionManagerCache,
   buildSessionContext,
 } from "@/lib/session-reader";
-import { getRpcSession, subagentDisplayStatus } from "@/lib/rpc-manager";
+import { getRpcSession, renameRpcSession, subagentDisplayStatus } from "@/lib/rpc-manager";
 import { projectTreeForResponse, toSummaryTree } from "@/lib/project-tree";
 import { computeSessionTotalActiveMs } from "@/lib/session-timing";
 import { computeSessionStats } from "@/lib/session-stats";
@@ -185,11 +185,14 @@ export async function PATCH(
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
     const filePath = await resolveSessionPath(id);
+    // A session a wrapper holds is renamed in it, never on disk behind its back (#1388).
+    // Its last await: no other await separates the wrapper check from the write below.
+    if (await renameRpcSession(id, name.trim())) return NextResponse.json({ ok: true });
     if (!filePath) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
-    // PATCH writes via appendSessionInfo — open fresh, bypassing the cache.
+    // No wrapper: appendSessionInfo on a fresh manager, bypassing the cache.
     const sm = openSessionManager(filePath, { mutable: true });
     sm.appendSessionInfo(name.trim());
     invalidateSessionManagerCache(filePath);

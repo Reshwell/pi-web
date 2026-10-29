@@ -2615,6 +2615,32 @@ export function getRpcSession(sessionId: string): AgentSessionWrapper | undefine
   return getRegistry().get(sessionId);
 }
 
+/**
+ * The sidebar's rename of a session a wrapper holds (#1388): through `AgentSession.setSessionName()`,
+ * as pi's `/name`, so the `session_info` entry hangs off the live leaf and extensions get
+ * `session_info_changed`. Appended to the file from outside, it was a dead branch the running
+ * session never saw. A start in flight is awaited (its `SessionManager` has already read the
+ * file), as is a wrapper shutting down (its extensions may still append from its leaf). Resolves
+ * false when no wrapper holds the session: the caller writes the file itself. An empty name
+ * clears the title, as on disk.
+ */
+export async function renameRpcSession(sessionId: string, name: string): Promise<boolean> {
+  for (;;) {
+    const wrapper = getRegistry().get(sessionId);
+    if (wrapper?.isAlive()) {
+      // After session_start, as auto-name; a failed binding still renames the session.
+      await wrapper.waitUntilReady?.().catch(() => undefined);
+      if (!wrapper.isAlive()) continue;
+      wrapper.inner.setSessionName(name);
+      invalidateSessionListCache();
+      return true;
+    }
+    const pending = getLocks().get(sessionId) ?? closingRpcSessionWait(sessionId);
+    if (!pending) return false;
+    await pending.catch(() => undefined);
+  }
+}
+
 export interface SetRpcSessionToolsResult {
   session: AgentSessionWrapper;
   sessionId: string;
