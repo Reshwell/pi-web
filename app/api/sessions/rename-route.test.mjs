@@ -60,12 +60,9 @@ function idleSessionOnDisk(t) {
   return { id, path: manager.getSessionFile() };
 }
 
-test("a live session is renamed through its AgentSession: on its leaf, with session_info_changed (#1388)", async (t) => {
+async function liveSession(t, extensionFactories) {
   const cwd = await mkdtemp(join(tmpdir(), "pi-web-rename-cwd-"));
   t.after(() => rm(cwd, { recursive: true, force: true }));
-  const seen = [];
-  const listener = (pi) => { pi.on("session_info_changed", (event) => { seen.push(event.name); }); };
-
   const faux = fauxProvider({ models: [{ id: "faux-rename" }] });
   const modelRuntime = await ModelRuntime.create({ authPath: join(agentDir, "auth.json"), modelsPath: null, refreshOnCreate: false });
   modelRuntime.registerNativeProvider(faux.provider);
@@ -74,7 +71,7 @@ test("a live session is renamed through its AgentSession: on its leaf, with sess
     cwd,
     agentDir,
     settingsManager,
-    extensionFactories: [listener],
+    extensionFactories,
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
@@ -94,8 +91,15 @@ test("a live session is renamed through its AgentSession: on its leaf, with sess
   t.after(() => wrapper.destroy());
   wrapper.start();
   wrapper.beginExtensionBinding();
-  await wrapper.waitUntilReady();
   withRegistry(t, [[session.sessionId, wrapper]]);
+  return { faux, session, wrapper };
+}
+
+test("a live session is renamed through its AgentSession: on its leaf, with session_info_changed (#1388)", async (t) => {
+  const seen = [];
+  const listener = (pi) => { pi.on("session_info_changed", (event) => { seen.push(event.name); }); };
+  const { faux, session, wrapper } = await liveSession(t, [listener]);
+  await wrapper.waitUntilReady();
 
   faux.setResponses([fauxAssistantMessage([fauxText("first")]), fauxAssistantMessage([fauxText("second")])]);
   await session.prompt("first prompt");
@@ -115,6 +119,25 @@ test("a live session is renamed through its AgentSession: on its leaf, with sess
   assert.equal(info.length, 1);
   assert.equal(info[0].parentId, tipBefore, "appended at the live leaf");
   assert.ok(entries.some((entry) => entry.parentId === info[0].id), "the next prompt continues from the rename: no dead branch");
+});
+
+test("a session_start that never settles does not hold the rename", async (t) => {
+  const seen = [];
+  const stuck = (pi) => {
+    // An extension parked on a dialog nobody answers.
+    pi.on("session_start", () => new Promise(() => {}));
+    pi.on("session_info_changed", (event) => { seen.push(event.name); });
+  };
+  const { session } = await liveSession(t, [stuck]);
+
+  let timer;
+  const timedOut = new Promise((resolve) => { timer = setTimeout(() => resolve("timed out"), 2_000); });
+  const response = await Promise.race([rename(session.sessionId, "While binding"), timedOut]);
+  clearTimeout(timer);
+  assert.notEqual(response, "timed out");
+  assert.equal(response.status, 200);
+  assert.equal(session.sessionManager.getSessionName(), "While binding");
+  assert.deepEqual(seen, ["While binding"]);
 });
 
 test("a rename waits for a start in flight and goes through the wrapper it registers", async (t) => {

@@ -185,18 +185,20 @@ export async function PATCH(
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
     const filePath = await resolveSessionPath(id);
+    const trimmed = name.trim();
     // A session a wrapper holds is renamed in it, never on disk behind its back (#1388).
-    // Its last await: no other await separates the wrapper check from the write below.
-    if (await renameRpcSession(id, name.trim())) return NextResponse.json({ ok: true });
-    if (!filePath) {
+    const renamed = await renameRpcSession(id, trimmed, () => {
+      if (!filePath) return false;
+      // No wrapper: appendSessionInfo on a fresh manager, bypassing the cache.
+      const sm = openSessionManager(filePath, { mutable: true });
+      sm.appendSessionInfo(trimmed);
+      invalidateSessionManagerCache(filePath);
+      invalidateSessionListCache();
+      return true;
+    });
+    if (!renamed) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
-
-    // No wrapper: appendSessionInfo on a fresh manager, bypassing the cache.
-    const sm = openSessionManager(filePath, { mutable: true });
-    sm.appendSessionInfo(name.trim());
-    invalidateSessionManagerCache(filePath);
-    invalidateSessionListCache();
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
