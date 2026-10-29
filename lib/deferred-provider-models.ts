@@ -30,10 +30,11 @@ export async function rememberProviderModels(runtime: ModelRuntime): Promise<voi
   const extensionProviders = new Set(runtime.getRegisteredProviderIds());
   const byProvider = new Map<string, RuntimeModel[]>();
   for (const model of await runtime.getAvailable()) {
-    // models.json providers load in every runtime; remembering them resurrects
-    // renamed/deleted ids. Virtual models have no physical model and may belong
-    // to a provider absent from getRegisteredProviderIds().
-    if (!extensionProviders.has(model.provider) && runtime.getPhysicalModel(model.provider, model.id)) continue;
+    // Only current virtual models qualify without a provider registration.
+    // A concurrent refresh may have removed a physical model while availability loaded.
+    if (!extensionProviders.has(model.provider)) {
+      if (!runtime.getModel(model.provider, model.id) || runtime.getPhysicalModel(model.provider, model.id)) continue;
+    }
     byProvider.set(model.provider, [...(byProvider.get(model.provider) ?? []), model]);
   }
   const added = [...byProvider.keys()].some((provider) => !catalog().has(provider));
