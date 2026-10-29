@@ -110,6 +110,21 @@ export function forkFailureMessage(code: string | undefined, error: string): { k
   }
 }
 
+/**
+ * A refused "New worktree…" (POST /api/worktrees): a branch another worktree
+ * has checked out names that checkout in the user's language (git checks a
+ * branch out once); anything else is the server's error, as before.
+ */
+export function worktreeCreateFailure(
+  data: { error?: string; code?: string; branch?: string; worktreePath?: string },
+  status: number,
+): { key: string; params: { branch: string; path: string } } | { error: string } {
+  if (data.code === "branch_in_use" && data.branch && data.worktreePath) {
+    return { key: "sidebar.worktreeBranchInUse", params: { branch: data.branch, path: data.worktreePath } };
+  }
+  return { error: data.error ?? `HTTP ${status}` };
+}
+
 /** Root ids per POST /api/sessions/delete (the route's MAX_SESSION_DELETE_IDS). */
 export const PROJECT_DELETE_IDS_PER_REQUEST = 500;
 

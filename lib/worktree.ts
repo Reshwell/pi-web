@@ -299,6 +299,19 @@ function sanitizeBranchForDir(branch: string): string {
   return branch.replace(/[\/\\:*?"<>|\s]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+/** A branch git will not check out twice: it is the branch of another worktree. */
+export class WorktreeBranchInUseError extends Error {
+  constructor(readonly branch: string, readonly worktreePath: string) {
+    super(`Branch '${branch}' is already checked out at ${worktreePath}`);
+  }
+}
+
+/** git's refusal to check out a branch another worktree holds (older git: "checked out at"). */
+function branchInUseFromGitError(message: string): WorktreeBranchInUseError | null {
+  const match = /'(.+)' is already (?:used by worktree|checked out) at '(.+)'/.exec(message);
+  return match ? new WorktreeBranchInUseError(match[1], toNativePath(match[2])) : null;
+}
+
 export async function addWorktree(cwd: string, branch: string): Promise<{ path: string; branch: string }> {
   const trimmed = branch.trim();
   if (!trimmed) throw new Error("Branch name is required");
@@ -307,6 +320,10 @@ export async function addWorktree(cwd: string, branch: string): Promise<{ path: 
   if (!dirName) throw new Error(`Invalid branch name: ${branch}`);
 
   const repoRoot = await getRepoRoot(cwd);
+  // Before the folder check: a branch pi-web already made a worktree for also
+  // has its folder, and the answer is where that checkout is, not the folder.
+  const holder = (await listWorktrees(repoRoot)).find((worktree) => worktree.branch === trimmed);
+  if (holder) throw new WorktreeBranchInUseError(trimmed, holder.path);
   const baseDir = `${resolve(repoRoot)}-worktrees`;
   const worktreePath = join(baseDir, dirName);
   if (existsSync(worktreePath)) {
@@ -345,7 +362,9 @@ export async function addWorktree(cwd: string, branch: string): Promise<{ path: 
       await git(repoRoot, addArgs, WORKTREE_TIMEOUT);
     }
   } catch (error) {
-    throw new Error(extractGitError(error));
+    // A worktree the listing skips (its folder is gone) still holds its branch.
+    const message = extractGitError(error);
+    throw branchInUseFromGitError(message) ?? new Error(message);
   }
 
   allowFileRoot(worktreePath);

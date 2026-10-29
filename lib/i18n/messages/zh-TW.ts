@@ -524,6 +524,7 @@ export const zhTWLocale: LocalePlugin = {
     "sidebar.newWorktree": "新增 worktree…",
     "sidebar.branchName": "分支名稱",
     "sidebar.creating": "建立中…",
+    "sidebar.worktreeBranchInUse": "分支「{branch}」已在 {path} checkout。",
     "sidebar.create": "建立",
     "sidebar.uploadFilesTitle": "將檔案上傳到專案根目錄",
     "sidebar.uploadFiles": "上傳檔案",

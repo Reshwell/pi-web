@@ -524,6 +524,7 @@ export const enLocale: LocalePlugin = {
     "sidebar.newWorktree": "New worktree…",
     "sidebar.branchName": "branch name",
     "sidebar.creating": "Creating…",
+    "sidebar.worktreeBranchInUse": "Branch “{branch}” is already checked out at {path}.",
     "sidebar.create": "Create",
     "sidebar.uploadFilesTitle": "Upload files to project root",
     "sidebar.uploadFiles": "Upload files",
