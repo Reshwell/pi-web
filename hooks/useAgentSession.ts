@@ -411,8 +411,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [modelNames, setModelNames] = useState<Record<string, string>>({});
   const [modelList, setModelList] = useState<ModelEntry[]>([]);
   const [modelError, setModelError] = useState<string | null>(null);
-  /** The session's or composer's folder, once a route said it no longer exists (#1422). */
-  const [missingCwd, setMissingCwd] = useState<string | null>(null);
+  // The session's or composer's folder, once a route said it no longer exists (#1422).
+  // Kept apart by source: a model list read from a removed worktree's main repo
+  // succeeds, and must not clear what a refused prompt reported.
+  const [modelsMissingCwd, setModelsMissingCwd] = useState<string | null>(null);
+  const [promptMissingCwd, setPromptMissingCwd] = useState<string | null>(null);
+  const missingCwd = promptMissingCwd ?? modelsMissingCwd;
   const [modelScopeWarnings, setModelScopeWarnings] = useState<string[]>([]);
   const [modelThinkingLevels, setModelThinkingLevels] = useState<Record<string, string[]>>({});
   const [modelThinkingLevelMaps, setModelThinkingLevelMaps] = useState<Record<string, Record<string, string | null>>>({});
@@ -2020,7 +2024,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       } else {
         throw new Error("No active session for the prompt");
       }
-      setMissingCwd(null);
+      setPromptMissingCwd(null);
       if (isSlashCommandPrompt && sentSessionId) {
         void waitForPromptSettlement(sentSessionId, promptRunId);
       }
@@ -2043,7 +2047,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       });
       // A folder that no longer exists never reached the model: the composer's
       // banner names it (translated) instead of the server's English notice.
-      if (e instanceof AgentCommandError && e.missingCwd) setMissingCwd(e.missingCwd);
+      if (e instanceof AgentCommandError && e.missingCwd) setPromptMissingCwd(e.missingCwd);
       else addNotice({ type: "error", message: e instanceof Error ? e.message : String(e) });
       restoreSubmission(message, images, composerDraftKey);
       optimisticUserMessageKeyRef.current = null;
@@ -2283,12 +2287,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     } catch (e) {
       if (!signal?.aborted && !(e instanceof DOMException && e.name === "AbortError")) {
         // A moved or deleted project folder is not a model problem (#1422).
-        setMissingCwd(cwdGone);
+        setModelsMissingCwd(cwdGone);
         setModelError(cwdGone ? null : e instanceof Error ? e.message : String(e));
       }
       throw e;
     }
-    setMissingCwd(null);
+    setModelsMissingCwd(null);
     setModelNames(d.models);
     setModelError(d.modelError ?? null);
     setModelScopeWarnings(d.modelScopeWarnings ?? []);
@@ -2541,6 +2545,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // accepted the queued prompt before the response was lost. Restoring in
       // that case would invite a duplicate turn.
       if (isPromptRejectedError(e)) restore();
+      if (e instanceof AgentCommandError && e.missingCwd) {
+        setPromptMissingCwd(e.missingCwd);
+        return;
+      }
       addNotice({
         type: "error",
         message: e instanceof Error ? e.message : String(e),

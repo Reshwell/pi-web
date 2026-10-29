@@ -47,7 +47,7 @@ function setup(fetchImpl) {
     MODELS_RETRY_DELAYS_MS: script(schedule.initializer.getText(source)).runInNewContext(),
     delay: async (ms) => { delays.push(ms); },
   };
-  for (const name of ["ModelError", "MissingCwd", "ModelNames", "ModelScopeWarnings", "ModelThinkingLevels", "ModelThinkingLevelMaps", "ModelList", "NewSessionDefaultModel", "NewSessionDefaultThinkingLevel", "SavedDefaultThinkingLevel", "NewSessionModel"]) {
+  for (const name of ["ModelError", "ModelsMissingCwd", "ModelNames", "ModelScopeWarnings", "ModelThinkingLevels", "ModelThinkingLevelMaps", "ModelList", "NewSessionDefaultModel", "NewSessionDefaultThinkingLevel", "SavedDefaultThinkingLevel", "NewSessionModel"]) {
     context[`set${name}`] = (value) => writes.push([name, value]);
   }
   context.loadModels = loadScript.runInNewContext(context);
@@ -65,7 +65,7 @@ test("model-load failures stay visible through bounded retries and clear on reco
     await state.run();
     assert.deepEqual(state.delays, [2_000, 5_000, 10_000]);
     assert.deepEqual(state.writes.filter(([name]) => name === "ModelError"), Array.from({ length: 4 }, () => ["ModelError", expected]));
-    assert.deepEqual(state.writes.filter(([name]) => name === "MissingCwd"), Array.from({ length: 4 }, () => ["MissingCwd", null]));
+    assert.deepEqual(state.writes.filter(([name]) => name === "ModelsMissingCwd"), Array.from({ length: 4 }, () => ["ModelsMissingCwd", null]));
   }
 
   let attempts = 0;
@@ -97,11 +97,14 @@ test("a folder that no longer exists is reported as such, not as a model error (
   });
   await state.run();
   assert.equal(attempts, 3);
-  assert.deepEqual(state.writes.filter(([name]) => name === "MissingCwd" || name === "ModelError"), [
-    ["MissingCwd", "/old/app"], ["ModelError", null],
-    ["MissingCwd", "/old/app"], ["ModelError", null],
-    ["MissingCwd", null], ["ModelError", null],
+  assert.deepEqual(state.writes.filter(([name]) => name === "ModelsMissingCwd" || name === "ModelError"), [
+    ["ModelsMissingCwd", "/old/app"], ["ModelError", null],
+    ["ModelsMissingCwd", "/old/app"], ["ModelError", null],
+    ["ModelsMissingCwd", null], ["ModelError", null],
   ]);
+  // A load answered from a removed worktree's main repo succeeds while the folder
+  // is still gone: it never clears what a refused prompt reported.
+  assert.equal(loader.getText(source).includes("setPromptMissingCwd"), false);
 });
 
 test("cancelling model loads prevents state writes and further retries", async () => {
