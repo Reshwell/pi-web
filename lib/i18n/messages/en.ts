@@ -525,6 +525,7 @@ export const enLocale: LocalePlugin = {
     "sidebar.branchName": "branch name",
     "sidebar.creating": "Creating…",
     "sidebar.worktreeBranchInUse": "Branch “{branch}” is already checked out at {path}.",
+    "sidebar.worktreeBranchMissing": "Branch “{branch}” still belongs to a worktree whose folder is gone ({path}). Run git worktree prune to clear it.",
     "sidebar.create": "Create",
     "sidebar.uploadFilesTitle": "Upload files to project root",
     "sidebar.uploadFiles": "Upload files",

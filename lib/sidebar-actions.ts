@@ -113,14 +113,18 @@ export function forkFailureMessage(code: string | undefined, error: string): { k
 /**
  * A refused "New worktree…" (POST /api/worktrees): a branch another worktree
  * has checked out names that checkout in the user's language (git checks a
- * branch out once); anything else is the server's error, as before.
+ * branch out once), or says its folder is gone and `git worktree prune`
+ * clears it; anything else is the server's error, as before.
  */
 export function worktreeCreateFailure(
   data: { error?: string; code?: string; branch?: string; worktreePath?: string },
   status: number,
 ): { key: string; params: { branch: string; path: string } } | { error: string } {
-  if (data.code === "branch_in_use" && data.branch && data.worktreePath) {
-    return { key: "sidebar.worktreeBranchInUse", params: { branch: data.branch, path: data.worktreePath } };
+  const key = data.code === "branch_in_use" ? "sidebar.worktreeBranchInUse"
+    : data.code === "branch_worktree_missing" ? "sidebar.worktreeBranchMissing"
+    : null;
+  if (key && data.branch && data.worktreePath) {
+    return { key, params: { branch: data.branch, path: data.worktreePath } };
   }
   return { error: data.error ?? `HTTP ${status}` };
 }
