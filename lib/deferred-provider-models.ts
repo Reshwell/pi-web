@@ -6,7 +6,7 @@ import { resolveVisibleModels, selectInitialModelScope, type InitialModelScopeOp
 type RuntimeModel = Awaited<ReturnType<ModelRuntime["getAvailable"]>>[number];
 
 /**
- * Models of every provider seen in any ModelRuntime of this process, by provider.
+ * Models of extension-registered providers seen in any ModelRuntime of this process, by provider.
  *
  * pi-web builds a runtime per `/api/models` load, and the Models panel's routes share one that
  * `lib/model-runtime.ts` builds again after a plugin change, a reload or its expiry. Some
@@ -25,10 +25,14 @@ function catalog(): Map<string, RuntimeModel[]> {
   return globalThis.__piWebProviderModelCatalog;
 }
 
-/** Record what a runtime offers, so later runtimes can show a provider they have not registered yet. */
+/** Record extension providers, so later runtimes can show one they have not registered yet. */
 export async function rememberProviderModels(runtime: ModelRuntime): Promise<void> {
+  const extensionProviders = new Set(runtime.getRegisteredProviderIds());
   const byProvider = new Map<string, RuntimeModel[]>();
   for (const model of await runtime.getAvailable()) {
+    // models.json providers are loaded in every runtime. Remembering them here
+    // would resurrect their old ids after a rename or deletion, even after Save.
+    if (!extensionProviders.has(model.provider)) continue;
     byProvider.set(model.provider, [...(byProvider.get(model.provider) ?? []), model]);
   }
   const added = [...byProvider.keys()].some((provider) => !catalog().has(provider));
