@@ -1523,8 +1523,12 @@ pre, code {
   display: block;
   height: auto;
 }
+/* An SVG with only a viewBox has a ratio but no size, so it would fill the
+   column: cap its height like a diagram's. */
 .svg-block-image {
+  width: auto;
   max-width: 100%;
+  max-height: min(360px, 50dvh);
 }
 .svg-block-image.is-unsized {
   width: 100%;
