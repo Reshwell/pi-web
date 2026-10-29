@@ -1135,6 +1135,10 @@ pre, code {
 }
 .markdown-body p { margin: 0 0 8px; }
 .markdown-body p:last-child { margin-bottom: 0; }
+/* A reply ending in a list, code block or table kept that block's bottom
+   margin, so its stats line sat further down than under a paragraph. */
+.markdown-body > :last-child,
+.markdown-body > :is(ul, ol):last-child > li:last-child { margin-bottom: 0; }
 .markdown-body h1, .markdown-body h2, .markdown-body h3,
 .markdown-body h4, .markdown-body h5, .markdown-body h6 {
   font-weight: 600;
@@ -1308,6 +1312,26 @@ pre, code {
 }
 .markdown-body .katex {
   font-size: 1.05em;
+}
+/* A display formula's Copy button (MarkdownBody's MathDisplay): on hover or
+   keyboard focus where the pointer can hover, always shown on touch screens. */
+.markdown-math-display {
+  position: relative;
+}
+.markdown-math-copy {
+  position: absolute;
+  top: 2px;
+  right: 0;
+}
+@media (hover: hover) {
+  .markdown-math-copy {
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+  .markdown-math-display:hover .markdown-math-copy,
+  .markdown-math-copy:focus-visible {
+    opacity: 1;
+  }
 }
 .markdown-user-message p {
   white-space: pre-wrap;
