@@ -766,6 +766,8 @@ export const zhCNLocale: LocalePlugin = {
     "chat.followUpHint": "在 Agent 完成后排队此消息",
     "chat.inputHistory": "输入历史",
     "chat.modelError": "模型错误",
+    "chat.cwdMissingTitle": "找不到项目文件夹",
+    "chat.cwdMissingBody": "{cwd} 已不存在，无法在此会话中发送消息。如果项目已移动或重命名，请在新位置新建会话。",
     "chat.modelScopeWarning": "模型范围警告",
     "chat.modelScopeWarnings": "模型范围警告",
     "chat.send": "发送",

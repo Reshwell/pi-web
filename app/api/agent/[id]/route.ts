@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveSessionPath } from "@/lib/session-reader";
 import { startRpcSession, getRpcSession, setRpcSessionTools } from "@/lib/rpc-manager";
+import { CwdMissingError, cwdMissingBody } from "@/lib/missing-cwd";
 
 // POST /api/agent/[id] - Send a command to an existing session
 export async function POST(
@@ -62,6 +63,7 @@ export async function POST(
   } catch (error) {
     return NextResponse.json({
       error: error instanceof Error ? error.message : String(error),
+      ...(error instanceof CwdMissingError ? cwdMissingBody(error.cwd) : {}),
       ...(commandType === "prompt" && !promptAccepted
         ? { code: "prompt_rejected", accepted: false }
         : {}),
