@@ -291,13 +291,14 @@ export function DebugPanelView({ page, server, samples = EMPTY_DEBUG_SAMPLES, se
       {page !== null && (
         <div className="debug-panel-scroll">
           {issues.length > 0 && <IssueList issues={issues} />}
+          {/* The chat at a glance, four tiles side by side; the server's sessions and totals below, full width. */}
           <div className="debug-tiles">
             <PageTile page={page} samples={samples} ctx={ctx} />
             <StreamTile page={page} reply={reply} ctx={ctx} />
             <LeaseTile page={page} ctx={ctx} />
+            <SessionCard reply={reply} detail={detail} targetSessionId={targetSessionId} ctx={ctx} />
           </div>
           <div className="debug-server">
-            <SessionCard reply={reply} detail={detail} targetSessionId={targetSessionId} ctx={ctx} />
             <SessionList reply={reply} detail={detail} groups={groups} sources={page.sources} ctx={ctx} />
           </div>
           <GlobalStrip reply={reply} ctx={ctx} />
@@ -420,6 +421,9 @@ function Bar({ fraction, tone, width, height = 4, notches, title, className }: {
     </span>
   );
 }
+
+// One width for the panel's bars and sparklines: a wide panel keeps a value next to its bar.
+const BAR_WIDTH = 120;
 
 const RING_LENGTH = 56.55; // 2π × 9
 
@@ -728,7 +732,7 @@ function FreshnessRow({ connection, freshness, heartbeatMs, ctx }: {
   return (
     <div className="debug-measures">
       <span className="debug-label">{t("debug.stream.lastData")}</span>
-      <Bar fraction={barFraction(ageMs, staleAfterMs) ?? 0} tone={tone} width="100%" notches={notches} title={title} />
+      <Bar fraction={barFraction(ageMs, staleAfterMs) ?? 0} tone={tone} width={BAR_WIDTH} notches={notches} title={title} />
       <span className={`debug-value is-${tone}`} title={title}>{formatDebugDuration(ageMs, t)}</span>
     </div>
   );
@@ -976,7 +980,7 @@ function CardRun({ detail, clock, ctx }: { detail: DebugSessionDetail; clock: De
         <div className="debug-idle-row">
           <span className="debug-label">{t("debug.server.idle")}</span>
           {idleFraction !== null && (
-            <Bar fraction={idleFraction} tone={idle.forcedByStop ? "warning" : "dim"} width={160} title={idleTitle} className="debug-idle-bar" />
+            <Bar fraction={idleFraction} tone={idle.forcedByStop ? "warning" : "dim"} width={BAR_WIDTH} title={idleTitle} className="debug-idle-bar" />
           )}
           {/* Closing after Stop: the list rows' stop square, not the amber alone. */}
           {idle.forcedByStop && <span className="debug-row-forced is-warning" role="img" aria-label={t("debug.server.idleForced")} title={t("debug.server.idleForced")} />}
@@ -1383,9 +1387,9 @@ const DEBUG_PANEL_CSS = `
     min-height: 0;
     flex: 1;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
     overflow: auto;
-    padding: 12px 16px 16px;
+    padding: 10px 16px 12px;
     font-size: 12px;
     line-height: 1.5;
   }
@@ -1449,10 +1453,11 @@ const DEBUG_PANEL_CSS = `
     overflow-wrap: anywhere;
   }
 
+  /* Four tiles in a row, the session's a little wider; two per row on a narrower panel, one on a phone. */
   .debug-tiles {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
-    gap: 12px 24px;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.3fr);
+    gap: 10px 20px;
   }
   .debug-tile,
   .debug-card,
@@ -1483,7 +1488,8 @@ const DEBUG_PANEL_CSS = `
   }
   .debug-measures {
     display: grid;
-    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    grid-template-columns: max-content max-content max-content;
+    justify-content: start;
     align-items: center;
     gap: 4px 8px;
   }
@@ -1576,7 +1582,7 @@ const DEBUG_PANEL_CSS = `
   }
   .debug-slot {
     display: inline-flex;
-    min-width: 34px;
+    min-width: 32px;
     height: 18px;
     box-sizing: border-box;
     align-items: center;
@@ -1671,10 +1677,7 @@ const DEBUG_PANEL_CSS = `
   }
 
   .debug-server {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
-    gap: 16px 24px;
-    padding-top: 12px;
+    padding-top: 10px;
     border-top: 1px solid var(--border);
   }
   .debug-card-head {
@@ -1898,7 +1901,7 @@ const DEBUG_PANEL_CSS = `
     flex-wrap: wrap;
     align-items: center;
     gap: 6px 16px;
-    padding-top: 12px;
+    padding-top: 10px;
     border-top: 1px solid var(--border);
     color: var(--text-dim);
     font-size: 11px;
@@ -1918,7 +1921,15 @@ const DEBUG_PANEL_CSS = `
     background: var(--border);
   }
 
+  @container debug-panel (max-width: 900px) {
+    .debug-tiles {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
   @container debug-panel (max-width: 520px) {
+    .debug-tiles {
+      grid-template-columns: minmax(0, 1fr);
+    }
     .debug-card-id {
       display: none;
     }

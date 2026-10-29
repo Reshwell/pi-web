@@ -588,8 +588,12 @@ test("the panel keeps to the theme and to Safari 16.2: tokens, the three state c
   assert.doesNotMatch(panelSource, /AbortSignal\.(any|timeout)|\(\?<[=!]/, "Safari 16.2");
   const css = panelSource.slice(panelSource.indexOf("const DEBUG_PANEL_CSS"));
   assert.doesNotMatch(css, /:has\(|&|transition/);
-  // Rules are flat: only the container query holds rules inside braces.
-  const outside = css.replace(/@container debug-panel \(max-width: 520px\) \{[^]*?\n {2}\}\n/, "");
+  // Rules are flat: only the container queries hold rules inside braces.
+  const outside = css.replace(/@container debug-panel \(max-width: \d+px\) \{[^]*?\n {2}\}\n/g, "");
+  // Four tiles in a row, two on a narrower panel, one on a phone; the bars keep one width.
+  assert.match(css, /\.debug-tiles \{\s*display: grid;\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\) minmax\(0, 1\.3fr\);/);
+  assert.match(css, /@container debug-panel \(max-width: 900px\) \{\s*\.debug-tiles \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(css, /@container debug-panel \(max-width: 520px\) \{\s*\.debug-tiles \{\s*grid-template-columns: minmax\(0, 1fr\);/);
   assert.doesNotMatch(outside, /\{[^}]*\{/, "no nested rule");
   assert.match(css, /container-type: inline-size;\s*container-name: debug-panel;/);
   assert.match(css, /@container debug-panel \(max-width: 520px\)/);
