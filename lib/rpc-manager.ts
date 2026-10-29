@@ -6,6 +6,7 @@ import { existsSync, realpathSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { isDeepStrictEqual } from "util";
 import { validateAgentImages } from "./image-attachments";
+import { cwdMissingError } from "./missing-cwd";
 import { invalidateModelsCache } from "./models-cache";
 import { invalidateModelRuntimeWithExtensions } from "./model-runtime";
 import { resolveVisibleModels, selectInitialModelScope } from "./model-scope";
@@ -1123,8 +1124,9 @@ export class AgentSessionWrapper {
       // run there would reach the model only for its tools to fail (and `write`
       // to recreate the folder). The pi CLI does not resume such a session
       // either; refuse as /api/agent/new does. (A `!` command already refuses.)
+      // Typed, so the route names the folder for the composer (#1422).
       if (type === "prompt" && !existsSync(this.cwd)) {
-        throw new Error(`Directory does not exist: ${this.cwd}`);
+        throw cwdMissingError(this.cwd);
       }
 
       switch (type) {
@@ -2628,6 +2630,31 @@ function trackStartingSession(cwd: string): () => void {
 
 export function getRpcSession(sessionId: string): AgentSessionWrapper | undefined {
   return getRegistry().get(sessionId);
+}
+
+/**
+ * The sidebar's rename (#1388). A session a wrapper holds is renamed through
+ * `AgentSession.setSessionName()`, as pi's `/name`, so the `session_info` entry hangs off the live
+ * leaf and extensions get `session_info_changed`; appended to the file from outside, it was a dead
+ * branch the running session never saw. Like the `set_session_name` command it does not wait for
+ * session_start: handlers are registered at load, and a session_start that never settles (an
+ * unanswered dialog) must not hold the rename. A start in flight is awaited (its `SessionManager`
+ * has already read the file), as is a wrapper shutting down (its extensions may still append from
+ * its leaf). With no wrapper and no start, `writeToDisk` runs synchronously right after that check,
+ * so nothing can open the file between the two. Resolves what `writeToDisk` returns, or true.
+ */
+export async function renameRpcSession(sessionId: string, name: string, writeToDisk: () => boolean): Promise<boolean> {
+  for (;;) {
+    const wrapper = getRegistry().get(sessionId);
+    if (wrapper?.isAlive()) {
+      wrapper.inner.setSessionName(name);
+      invalidateSessionListCache();
+      return true;
+    }
+    const pending = getLocks().get(sessionId) ?? closingRpcSessionWait(sessionId);
+    if (!pending) return writeToDisk();
+    await pending.catch(() => undefined);
+  }
 }
 
 export interface SetRpcSessionToolsResult {
